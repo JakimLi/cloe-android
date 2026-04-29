@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:gravity="center">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="🌸 Cloe"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="24dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="PC 的 Tailscale IP"
+        android:textSize="14sp"
+        android:layout_marginBottom="8dp" />
+
+    <EditText
+        android:id="@+id/et_host"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:inputType="textUri"
+        android:hint="100.x.x.x"
+        android:textAlignment="center"
+        android:background="@android:drawable/edit_text"
+        android:layout_marginBottom="16dp" />
+
+    <Button
+        android:id="@+id/btn_permission"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="授予悬浮窗权限" />
+
+    <Button
+        android:id="@+id/btn_connect"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="连接"
+        android:layout_marginTop="8dp" />
+
+    <Button
+        android:id="@+id/btn_disconnect"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="断开"
+        android:layout_marginTop="8dp" />
+
+    <TextView
+        android:id="@+id/tv_status"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:textSize="14sp" />
+
+</LinearLayout>
