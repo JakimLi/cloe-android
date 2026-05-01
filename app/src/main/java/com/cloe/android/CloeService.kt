@@ -42,7 +42,11 @@ class CloeService : Service() {
             "tease" to "tease.gif",
             "speak" to "speak.gif",
             "shake_head" to "shake_head.gif",
-            "working" to "working.gif"
+            "working" to "working.gif",
+            "clap" to "clap.gif",
+            "shy" to "shy.gif",
+            "yawn" to "yawn.gif",
+            "laugh" to "laugh.gif"
         )
 
         // Idle weights: blink×2, smile×2, kiss×1, think×1, nod×1, shake_head×1
