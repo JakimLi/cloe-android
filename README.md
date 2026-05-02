@@ -1,6 +1,6 @@
 # Cloe Android
 
-Android floating window client for Cloe. Connects to the PC-side Bridge via Tailscale networking to display Cloe's GIF animations remotely.
+Android floating window client for [Cloe Desktop](https://github.com/JakimLi/cloe-desktop). Connects to the PC-side Bridge via Tailscale networking to display Cloe's GIF animations remotely.
 
 ## Architecture
 
