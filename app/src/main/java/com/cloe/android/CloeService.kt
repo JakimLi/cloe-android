@@ -8,6 +8,7 @@ import android.graphics.PixelFormat
 import android.os.Build
 import android.os.IBinder
 import android.util.JsonReader
+import android.util.Log
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -19,6 +20,7 @@ import com.bumptech.glide.Glide
 import kotlinx.coroutines.*
 import org.java_websocket.client.WebSocketClient
 import org.java_websocket.handshake.ServerHandshake
+import org.json.JSONObject
 import java.io.File
 import java.io.StringReader
 import java.net.URI
@@ -28,11 +30,12 @@ class CloeService : Service() {
 
     companion object {
         var isRunning = false
+        private const val TAG = "CloeService"
         private const val NOTIFICATION_ID = 1001
         private const val WS_PORT = 19850
 
-        // GIF action -> filename mapping (same as Electron renderer)
-        private val ACTION_MAP = mapOf(
+        /** Built-in asset mapping (same logical names as Electron / bridge) */
+        private val DEFAULT_ACTION_MAP = mapOf(
             "smile" to "smile.gif",
             "blink" to "blink.gif",
             "kiss" to "kiss.gif",
@@ -49,8 +52,7 @@ class CloeService : Service() {
             "laugh" to "laugh.gif"
         )
 
-        // Idle weights: blink×2, smile×2, kiss×1, think×1, nod×1, shake_head×1
-        private val IDLE_ACTIONS = listOf(
+        private val DEFAULT_IDLE_ACTIONS = listOf(
             "blink", "blink", "smile", "smile",
             "kiss", "think", "nod", "shake_head"
         )
@@ -68,9 +70,15 @@ class CloeService : Service() {
     private var isWorking = false
     private var lastAction: String = ""
     private var host: String = ""
+    private var sessionStarted = false
 
-    // GIF assets path prefix
-    private val gifCache = mutableMapOf<String, String>()
+    /** Which synced set folder to use (follows PC WebSocket set-config.setId). */
+    private var displaySetId: String = "default"
+
+    /** action name → absolute path (bundled copy and/or remote GIF) */
+    private val defaultPathByAction = linkedMapOf<String, String>()
+    private val pathByAction = linkedMapOf<String, String>()
+    private val idleActions = mutableListOf<String>()
 
     // === Service lifecycle ===
 
@@ -79,16 +87,41 @@ class CloeService : Service() {
     override fun onCreate() {
         super.onCreate()
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        // Pre-cache asset file paths
-        ACTION_MAP.values.forEach { name ->
-            val file = copyAssetToFile("gifs/$name")
-            if (file != null) gifCache[name] = file
+        bootstrapActionPaths()
+    }
+
+    private fun bootstrapActionPaths() {
+        defaultPathByAction.clear()
+        for ((action, assetName) in DEFAULT_ACTION_MAP) {
+            val file = copyAssetToFile("gifs/$assetName")
+            if (file != null) defaultPathByAction[action] = file
         }
+        displaySetId = ActionSync.readFullMeta(this)?.activeSetIdAtSync ?: "default"
+        rebuildPathAndIdleMaps()
+    }
+
+    private fun rebuildPathAndIdleMaps() {
+        pathByAction.clear()
+        pathByAction.putAll(defaultPathByAction)
+        pathByAction.putAll(ActionSync.loadRemoteActionPathsForSet(this, displaySetId))
+        idleActions.clear()
+        val full = ActionSync.readFullMeta(this)
+        val idleFromMeta = full?.initialIdlePlaylist.orEmpty()
+        if (idleFromMeta.isNotEmpty() && idleFromMeta.all { pathByAction.containsKey(it) }) {
+            idleActions.addAll(idleFromMeta)
+        } else {
+            idleActions.addAll(DEFAULT_IDLE_ACTIONS)
+        }
+    }
+
+    fun reloadActionPaths() {
+        ActionSync.readFullMeta(this)?.activeSetIdAtSync?.let { displaySetId = it }
+        rebuildPathAndIdleMaps()
+        Log.i(TAG, "reloadActionPaths set=$displaySetId actions=${pathByAction.size} idle=${idleActions.size}")
     }
 
     /**
      * Copy asset to internal cache dir so Glide can load it via file://
-     * Returns absolute file path, or null on failure.
      */
     private fun copyAssetToFile(assetPath: String): String? {
         return try {
@@ -106,8 +139,19 @@ class CloeService : Service() {
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        host = intent?.getStringExtra("host") ?: return START_NOT_STICKY
+        if (intent?.getBooleanExtra("reload_actions", false) == true) {
+            reloadActionPaths()
+            if (sessionStarted) return START_STICKY
+        }
 
+        val h = intent?.getStringExtra("host")?.trim().orEmpty()
+        if (h.isNotBlank()) host = h
+
+        if (host.isBlank()) return START_NOT_STICKY
+
+        if (sessionStarted) return START_STICKY
+
+        sessionStarted = true
         startForegroundNotification()
         isRunning = true
 
@@ -121,6 +165,7 @@ class CloeService : Service() {
 
     override fun onDestroy() {
         isRunning = false
+        sessionStarted = false
         idleJob?.cancel()
         scope.cancel()
         wsClient?.close()
@@ -187,10 +232,8 @@ class CloeService : Service() {
             y = 200
         }
 
-        // Store ImageView reference for GIF updates
         layout.tag = gifView
 
-        // Drag (Gravity.END: x is offset from right edge, so dx is inverted)
         var lastX = 0; var lastY = 0; var moved = false
         gifView.setOnTouchListener { _, event ->
             when (event.action) {
@@ -261,18 +304,15 @@ class CloeService : Service() {
     }
 
     private fun showCollapsed() {
-        isWorking = true // pause idle
+        isWorking = true
         expandedView?.let { try { windowManager.removeView(it) } catch (_: Exception) {} }
         collapsedView?.let { try { windowManager.addView(it, paramsCollapsed) } catch (_: Exception) {} }
     }
 
-    // === GIF loading (from local assets, no network) ===
-
     private fun getGifView(): ImageView? = expandedView?.tag as? ImageView
 
     private fun loadGif(action: String) {
-        val filename = ACTION_MAP[action] ?: return
-        val filePath = gifCache[filename] ?: return
+        val filePath = pathByAction[action] ?: return
         val handler = android.os.Handler(android.os.Looper.getMainLooper())
         handler.post {
             Glide.with(this@CloeService)
@@ -313,8 +353,30 @@ class CloeService : Service() {
 
     private fun handleMessage(raw: String) {
         try {
-            val data = JsonReader(StringReader(raw)).use { reader ->
-                var action = ""
+            val trimmed = raw.trim()
+            if (trimmed.startsWith("{")) {
+                val o = JSONObject(trimmed)
+                if (o.optString("type") == "set-config") {
+                    applySetConfig(o)
+                    return
+                }
+                val action = o.optString("action", "")
+                if (action.isNotEmpty()) {
+                    dispatchAction(action, o)
+                    return
+                }
+            }
+            // Legacy: minimal JSON with only action (parse without full JSONObject)
+            val actionOnly = parseLegacyAction(raw)
+            if (actionOnly != null) dispatchAction(actionOnly, null)
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun parseLegacyAction(raw: String): String? {
+        return try {
+            var action = ""
+            JsonReader(StringReader(raw)).use { reader ->
                 reader.beginObject()
                 while (reader.hasNext()) {
                     when (reader.nextName()) {
@@ -323,20 +385,68 @@ class CloeService : Service() {
                     }
                 }
                 reader.endObject()
-                action
             }
+            action.ifBlank { null }
+        } catch (_: Exception) {
+            null
+        }
+    }
 
-            when (data) {
-                "idle" -> { isWorking = false; startIdleLoop() }
-                "working" -> { isWorking = true; idleJob?.cancel(); playAction("working") }
-                "wave" -> { showExpanded(); playAction("wave") }
-                "kiss" -> playAction("kiss")
-                else -> playAction(data)
+    private fun applySetConfig(o: JSONObject) {
+        val full = ActionSync.readFullMeta(this)
+        val sid = o.optString("setId", "")
+        val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+
+        if (sid.isNotEmpty()) {
+            if (full != null && !full.hasSet(sid)) {
+                mainHandler.post {
+                    Toast.makeText(
+                        this,
+                        "PC 当前套装未在本地缓存，请重新「从 PC 拉取动作」",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
             }
-        } catch (_: Exception) {}
+            displaySetId = sid
+            rebuildPathAndIdleMaps()
+        }
+
+        val idleJa = o.optJSONArray("idlePlaylist") ?: return
+        val candidates = buildList {
+            for (i in 0 until idleJa.length()) add(idleJa.getString(i))
+        }
+        if (candidates.isEmpty()) return
+        if (candidates.all { pathByAction.containsKey(it) }) {
+            idleActions.clear()
+            idleActions.addAll(candidates)
+        }
+    }
+
+    private fun dispatchAction(action: String, @Suppress("UNUSED_PARAMETER") full: JSONObject?) {
+        when (action) {
+            "idle" -> {
+                isWorking = false
+                startIdleLoop()
+            }
+            "working" -> {
+                isWorking = true
+                idleJob?.cancel()
+                playAction("working")
+            }
+            "wave" -> {
+                showExpanded()
+                playAction("wave")
+            }
+            "kiss" -> playAction("kiss")
+            else -> playAction(action)
+        }
     }
 
     private fun playAction(action: String) {
+        if (!pathByAction.containsKey(action)) {
+            Log.w(TAG, "No local GIF for action: $action (pull from PC or check套装)")
+            return
+        }
         if (action == lastAction) return
         lastAction = action
         loadGif(action)
@@ -350,17 +460,22 @@ class CloeService : Service() {
         }
     }
 
-    // === Idle loop ===
-
-    private fun startIdleLoop() { idleJob?.cancel(); scheduleNextIdle() }
+    private fun startIdleLoop() {
+        idleJob?.cancel()
+        scheduleNextIdle()
+    }
 
     private fun scheduleNextIdle() {
         idleJob?.cancel()
+        if (idleActions.isEmpty()) return
         idleJob = scope.launch {
             delay((8000..15000).random().toLong())
             if (!isWorking) {
-                var next = IDLE_ACTIONS.random()
-                while (next == lastAction) next = IDLE_ACTIONS.random()
+                var next = idleActions.random()
+                var guard = 0
+                while (next == lastAction && idleActions.size > 1 && guard++ < 8) {
+                    next = idleActions.random()
+                }
                 lastAction = next
                 loadGif(next)
                 scheduleNextIdle()

@@ -16,7 +16,8 @@
         android:allowBackup="false"
         android:label="Cloe"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Cloe">
+        android:theme="@style/Theme.Cloe"
+        android:usesCleartextTraffic="true">
 
         <!-- Main activity: settings + permission request -->
         <activity

@@ -45,6 +45,13 @@
         android:layout_marginTop="8dp" />
 
     <Button
+        android:id="@+id/btn_pull_actions"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="从 PC 拉取动作（GIF）"
+        android:layout_marginTop="8dp" />
+
+    <Button
         android:id="@+id/btn_disconnect"
         android:layout_width="match_parent"
         android:layout_height="48dp"
