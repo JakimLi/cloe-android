@@ -514,8 +514,10 @@ class CloeService : Service() {
     private fun playSpeakWithAudio(audioName: String, audioUrl: String) {
         idleJob?.cancel()
         isSpeaking = true
-        lastAction = "speak"
-        loadGif("speak")
+
+        // Show a transition animation while downloading (not speaking yet!)
+        lastAction = "smile"
+        loadGif("smile")
 
         // Build download URL
         val url = when {
@@ -537,7 +539,7 @@ class CloeService : Service() {
                 val audioFile = downloadAudio(url)
                 if (!isSpeaking) return@launch // cancelled while downloading
                 withContext(Dispatchers.Main) {
-                    playAudioFile(audioFile)
+                    playAudioWithSpeakGif(audioFile)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to download/play audio: ${e.message}")
@@ -570,12 +572,15 @@ class CloeService : Service() {
         return cacheFile
     }
 
-    private fun playAudioFile(file: File) {
+    private fun playAudioWithSpeakGif(file: File) {
         releaseMediaPlayer()
         try {
             mediaPlayer = MediaPlayer().apply {
                 setDataSource(file.absolutePath)
                 setOnPreparedListener { mp ->
+                    // Audio ready → switch to speak GIF and play simultaneously
+                    lastAction = "speak"
+                    loadGif("speak")
                     mp.start()
                     Log.i(TAG, "Audio playing: ${file.name}")
                 }
