@@ -23,6 +23,7 @@ import org.java_websocket.client.WebSocketClient
 import org.java_websocket.handshake.ServerHandshake
 import org.json.JSONObject
 import java.io.File
+import java.io.IOException
 import java.io.StringReader
 import java.net.URI
 import kotlin.math.abs
@@ -553,15 +554,22 @@ class CloeService : Service() {
         val fileName = urlString.substringAfterLast("/").substringBefore("?")
         val cacheDir = File(cacheDir, "audio")
         val cacheFile = File(cacheDir, fileName)
-        if (cacheFile.exists()) return cacheFile
+        if (cacheFile.exists() && cacheFile.length() > 0) return cacheFile
+
+        // Delete corrupted/empty cached file
+        if (cacheFile.exists()) cacheFile.delete()
 
         cacheDir.mkdirs()
+        Log.i(TAG, "Downloading audio: $urlString")
 
         // Download with timeout
         val connection = java.net.URL(urlString).openConnection()
         connection.connectTimeout = 10000
         connection.readTimeout = 30000
-        connection.connect()
+        val responseCode = (connection as java.net.HttpURLConnection).responseCode
+        if (responseCode != 200) {
+            throw IOException("HTTP $responseCode for $urlString")
+        }
 
         cacheFile.outputStream().use { output ->
             connection.getInputStream().use { input ->
