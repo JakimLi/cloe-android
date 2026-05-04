@@ -13,6 +13,7 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.media.MediaPlayer
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.Toast
@@ -68,6 +69,8 @@ class CloeService : Service() {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var idleJob: Job? = null
     private var isWorking = false
+    private var isSpeaking = false
+    private var mediaPlayer: MediaPlayer? = null
     private var lastAction: String = ""
     private var host: String = ""
     private var sessionStarted = false
@@ -167,6 +170,7 @@ class CloeService : Service() {
         isRunning = false
         sessionStarted = false
         idleJob?.cancel()
+        releaseMediaPlayer()
         scope.cancel()
         wsClient?.close()
         expandedView?.let { try { windowManager.removeView(it) } catch (_: Exception) {} }
@@ -422,23 +426,37 @@ class CloeService : Service() {
         }
     }
 
-    private fun dispatchAction(action: String, @Suppress("UNUSED_PARAMETER") full: JSONObject?) {
+    private fun dispatchAction(action: String, full: JSONObject?) {
         when (action) {
             "idle" -> {
+                if (isSpeaking) return // don't interrupt speaking
                 isWorking = false
                 startIdleLoop()
             }
             "working" -> {
+                stopSpeaking()
                 isWorking = true
                 idleJob?.cancel()
                 playAction("working")
             }
             "wave" -> {
+                stopSpeaking()
                 showExpanded()
                 playAction("wave")
             }
-            "kiss" -> playAction("kiss")
-            else -> playAction(action)
+            "speak" -> {
+                val audioName = full?.optString("audio", "") ?: ""
+                val audioUrl = full?.optString("audio_url", "") ?: ""
+                if (audioName.isNotEmpty() || audioUrl.isNotEmpty()) {
+                    playSpeakWithAudio(audioName, audioUrl)
+                } else {
+                    playAction("speak")
+                }
+            }
+            else -> {
+                stopSpeaking()
+                playAction(action)
+            }
         }
     }
 
@@ -489,5 +507,112 @@ class CloeService : Service() {
                 }
             }
         }
+    }
+
+    // === Speak with audio ===
+
+    private fun playSpeakWithAudio(audioName: String, audioUrl: String) {
+        idleJob?.cancel()
+        isSpeaking = true
+        lastAction = "speak"
+        loadGif("speak")
+
+        // Build download URL
+        val url = when {
+            audioUrl.isNotEmpty() -> {
+                // Replace localhost/127.0.0.1 with the connected host
+                audioUrl
+                    .replace("localhost", host)
+                    .replace("127.0.0.1", host)
+            }
+            audioName.isNotEmpty() -> "http://$host:19851/audio/$audioName.mp3"
+            else -> {
+                isSpeaking = false
+                return
+            }
+        }
+
+        scope.launch {
+            try {
+                val audioFile = downloadAudio(url)
+                if (!isSpeaking) return@launch // cancelled while downloading
+                withContext(Dispatchers.Main) {
+                    playAudioFile(audioFile)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to download/play audio: ${e.message}")
+                isSpeaking = false
+                if (!isWorking) scheduleNextIdle()
+            }
+        }
+    }
+
+    private suspend fun downloadAudio(urlString: String): File {
+        val fileName = urlString.substringAfterLast("/").substringBefore("?")
+        val cacheDir = File(cacheDir, "audio")
+        val cacheFile = File(cacheDir, fileName)
+        if (cacheFile.exists()) return cacheFile
+
+        cacheDir.mkdirs()
+
+        // Download with timeout
+        val connection = java.net.URL(urlString).openConnection()
+        connection.connectTimeout = 10000
+        connection.readTimeout = 30000
+        connection.connect()
+
+        cacheFile.outputStream().use { output ->
+            connection.getInputStream().use { input ->
+                input.copyTo(output)
+            }
+        }
+        Log.i(TAG, "Audio downloaded: ${cacheFile.name} (${cacheFile.length()} bytes)")
+        return cacheFile
+    }
+
+    private fun playAudioFile(file: File) {
+        releaseMediaPlayer()
+        try {
+            mediaPlayer = MediaPlayer().apply {
+                setDataSource(file.absolutePath)
+                setOnPreparedListener { mp ->
+                    mp.start()
+                    Log.i(TAG, "Audio playing: ${file.name}")
+                }
+                setOnCompletionListener {
+                    Log.i(TAG, "Audio completed: ${file.name}")
+                    isSpeaking = false
+                    if (!isWorking) scheduleNextIdle()
+                }
+                setOnErrorListener { _, what, extra ->
+                    Log.e(TAG, "Audio error: what=$what extra=$extra")
+                    isSpeaking = false
+                    if (!isWorking) scheduleNextIdle()
+                    true
+                }
+                prepareAsync()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "MediaPlayer error: ${e.message}")
+            isSpeaking = false
+            if (!isWorking) scheduleNextIdle()
+        }
+    }
+
+    private fun stopSpeaking() {
+        if (isSpeaking) {
+            releaseMediaPlayer()
+            isSpeaking = false
+        }
+    }
+
+    private fun releaseMediaPlayer() {
+        try {
+            mediaPlayer?.let { mp ->
+                if (mp.isPlaying) mp.stop()
+                mp.release()
+            }
+        } catch (_: Exception) {}
+        mediaPlayer = null
     }
 }
