@@ -442,19 +442,22 @@ class CloeService : Service() {
         }
     }
 
-    private fun playAction(action: String) {
+    private fun playAction(action: String, isReaction: Boolean = true) {
         if (!pathByAction.containsKey(action)) {
             Log.w(TAG, "No local GIF for action: $action (pull from PC or check套装)")
             return
         }
-        if (action == lastAction) return
+        // Skip only if same as last AND it's an idle-triggered action
+        if (action == lastAction && !isReaction) return
         lastAction = action
         loadGif(action)
 
         if (action != "working") {
             idleJob?.cancel()
             idleJob = scope.launch {
-                delay(3000)
+                // Reactions from Hermes/curl get extra display time before idle resumes
+                val cooldownMs = if (isReaction) 4000L else 3000L
+                delay(cooldownMs)
                 if (!isWorking) scheduleNextIdle()
             }
         }
@@ -478,7 +481,12 @@ class CloeService : Service() {
                 }
                 lastAction = next
                 loadGif(next)
-                scheduleNextIdle()
+                // Continue idle loop (isReaction=false: don't force-replay same action)
+                idleJob?.cancel()
+                idleJob = scope.launch {
+                    delay(3000)
+                    if (!isWorking) scheduleNextIdle()
+                }
             }
         }
     }
