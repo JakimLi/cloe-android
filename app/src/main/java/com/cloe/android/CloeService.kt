@@ -527,7 +527,7 @@ class CloeService : Service() {
                     .replace("localhost", host)
                     .replace("127.0.0.1", host)
             }
-            audioName.isNotEmpty() -> "http://$host:19851/audio/$audioName.mp3"
+            audioName.isNotEmpty() -> "http://$host:19851/tts/${audioName}.mp3"
             else -> {
                 isSpeaking = false
                 return
