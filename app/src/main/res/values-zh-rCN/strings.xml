@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Cloe</string>
+
+    <string name="main_title">Cloe</string>
+    <string name="section_connection">连接</string>
+    <string name="section_actions">动作预览</string>
+    <string name="section_settings">设置</string>
+    <string name="section_language">语言</string>
+    <string name="section_overlay_position">悬浮位置</string>
+    <string name="nav_tab_connect">连接</string>
+    <string name="nav_tab_settings">设置</string>
+    <string name="nav_tab_actions">预览</string>
+    <string name="language_tab_hint">点选下方一项即可切换，界面会立即刷新。</string>
+    <string name="settings_position_hint">先在桌面上拖动形象到满意位置，再点击下方按钮保存为默认出现位置。</string>
+    <string name="btn_save_overlay_position">保存当前悬浮位置</string>
+    <string name="overlay_position_not_saved">尚未保存 — 使用默认右上角偏移。</string>
+    <string name="overlay_saved_format">已保存：x=%1$d，y=%2$d（相对屏幕右上角）</string>
+    <string name="toast_save_position_need_connect">请先连接，让形象显示在桌面上。</string>
+    <string name="toast_position_saved">已保存为默认位置</string>
+    <string name="label_tailscale_ip">PC 的 Tailscale IP</string>
+    <string name="hint_tailscale_ip">例如 100.x.x.x</string>
+    <string name="btn_overlay_permission">授予悬浮窗权限</string>
+    <string name="btn_connect">连接</string>
+    <string name="btn_pull_actions">从 PC 拉取动作（GIF）</string>
+    <string name="btn_disconnect">断开</string>
+    <string name="status_need_overlay">⚠ 请先授予悬浮窗权限</string>
+    <string name="status_connected">✓ 已连接，Cloe 正在桌面上</string>
+    <string name="status_disconnected">未连接</string>
+    <string name="toast_enter_ip">请输入 PC 的 Tailscale IP</string>
+    <string name="toast_pull_ok">已全量拉取 %d 个 GIF（所有套装）</string>
+    <string name="toast_pull_fail">拉取失败</string>
+
+    <string name="locale_follow_system">跟随系统</string>
+    <string name="locale_zh">中文</string>
+    <string name="locale_en">English</string>
+
+    <string name="footer_version">版本 %s</string>
+</resources>

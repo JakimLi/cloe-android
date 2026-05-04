@@ -3,5 +3,8 @@ build/
 *.iml
 .idea/
 local.properties
+keystore.properties
+*.jks
+*.keystore
 *.apk
 .cxx/

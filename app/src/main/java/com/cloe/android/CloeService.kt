@@ -4,18 +4,24 @@ import android.annotation.SuppressLint
 import android.app.*
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
+import android.graphics.Outline
 import android.graphics.PixelFormat
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.IBinder
+import android.os.SystemClock
 import android.util.JsonReader
 import android.util.Log
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
+import android.view.ViewOutlineProvider
 import android.view.WindowManager
 import android.media.MediaPlayer
+import android.widget.FrameLayout
 import android.widget.ImageView
-import android.widget.LinearLayout
 import android.widget.Toast
 import com.bumptech.glide.Glide
 import kotlinx.coroutines.*
@@ -35,9 +41,11 @@ class CloeService : Service() {
         private const val TAG = "CloeService"
         private const val NOTIFICATION_ID = 1001
         private const val WS_PORT = 19850
+        /** Max interval between two taps to count as double-tap (ms) */
+        private const val DOUBLE_TAP_MS = 320L
 
         /** Built-in asset mapping (same logical names as Electron / bridge) */
-        private val DEFAULT_ACTION_MAP = mapOf(
+        val DEFAULT_ACTION_MAP = mapOf(
             "smile" to "smile.gif",
             "blink" to "blink.gif",
             "kiss" to "kiss.gif",
@@ -58,6 +66,31 @@ class CloeService : Service() {
             "blink", "blink", "smile", "smile",
             "kiss", "think", "nod", "shake_head"
         )
+
+        fun copyAssetToFile(context: Context, assetPath: String): String? {
+            return try {
+                val cacheFile = File(context.cacheDir, assetPath.replace("/", "_"))
+                if (cacheFile.exists()) return cacheFile.absolutePath
+                cacheFile.parentFile?.mkdirs()
+                context.assets.open(assetPath).use { input ->
+                    cacheFile.outputStream().use { output -> input.copyTo(output) }
+                }
+                cacheFile.absolutePath
+            } catch (e: Exception) {
+                null
+            }
+        }
+
+        fun getAvailableActions(context: Context): Map<String, String> {
+            val paths = linkedMapOf<String, String>()
+            for ((action, assetName) in DEFAULT_ACTION_MAP) {
+                val file = copyAssetToFile(context, "gifs/$assetName")
+                if (file != null) paths[action] = file
+            }
+            val displaySetId = ActionSync.readFullMeta(context)?.activeSetIdAtSync ?: "default"
+            paths.putAll(ActionSync.loadRemoteActionPathsForSet(context, displaySetId))
+            return paths
+        }
     }
 
     private lateinit var windowManager: WindowManager
@@ -65,6 +98,8 @@ class CloeService : Service() {
     private var collapsedView: View? = null
     private var paramsExpanded: WindowManager.LayoutParams? = null
     private var paramsCollapsed: WindowManager.LayoutParams? = null
+    /** Collapsed chip: circular preview of current action */
+    private var collapsedThumbView: ImageView? = null
 
     private var wsClient: WebSocketClient? = null
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -97,7 +132,7 @@ class CloeService : Service() {
     private fun bootstrapActionPaths() {
         defaultPathByAction.clear()
         for ((action, assetName) in DEFAULT_ACTION_MAP) {
-            val file = copyAssetToFile("gifs/$assetName")
+            val file = copyAssetToFile(this, "gifs/$assetName")
             if (file != null) defaultPathByAction[action] = file
         }
         displaySetId = ActionSync.readFullMeta(this)?.activeSetIdAtSync ?: "default"
@@ -124,28 +159,16 @@ class CloeService : Service() {
         Log.i(TAG, "reloadActionPaths set=$displaySetId actions=${pathByAction.size} idle=${idleActions.size}")
     }
 
-    /**
-     * Copy asset to internal cache dir so Glide can load it via file://
-     */
-    private fun copyAssetToFile(assetPath: String): String? {
-        return try {
-            val cacheFile = File(cacheDir, assetPath.replace("/", "_"))
-            if (cacheFile.exists()) return cacheFile.absolutePath
-            cacheFile.parentFile?.mkdirs()
-            assets.open(assetPath).use { input ->
-                cacheFile.outputStream().use { output -> input.copyTo(output) }
-            }
-            cacheFile.absolutePath
-        } catch (e: Exception) {
-            null
-        }
-    }
-
     @SuppressLint("ClickableViewAccessibility")
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.getBooleanExtra("reload_actions", false) == true) {
             reloadActionPaths()
             if (sessionStarted) return START_STICKY
+        }
+
+        if (intent?.getBooleanExtra("save_overlay_position", false) == true) {
+            if (sessionStarted) saveCurrentOverlayPositionToPrefs()
+            return START_STICKY
         }
 
         val h = intent?.getStringExtra("host")?.trim().orEmpty()
@@ -206,40 +229,88 @@ class CloeService : Service() {
             @Suppress("DEPRECATION")
             WindowManager.LayoutParams.TYPE_PHONE
 
+    private fun readOverlayXYFromPrefs(): Pair<Int, Int> {
+        val sp = getSharedPreferences(CloePrefs.NAME, Context.MODE_PRIVATE)
+        if (!sp.getBoolean(CloePrefs.KEY_OVERLAY_SAVED, false)) {
+            return CloePrefs.DEFAULT_OVERLAY_X to CloePrefs.DEFAULT_OVERLAY_Y
+        }
+        val x = sp.getInt(CloePrefs.KEY_OVERLAY_X, CloePrefs.DEFAULT_OVERLAY_X)
+        val y = sp.getInt(CloePrefs.KEY_OVERLAY_Y, CloePrefs.DEFAULT_OVERLAY_Y)
+        return x to y
+    }
+
+    private fun currentOverlayLayoutParamsOffset(): Pair<Int, Int>? = when {
+        expandedView?.isAttachedToWindow == true ->
+            paramsExpanded?.let { it.x to it.y }
+        collapsedView?.isAttachedToWindow == true ->
+            paramsCollapsed?.let { it.x to it.y }
+        else -> null
+    }
+
+    private fun saveCurrentOverlayPositionToPrefs() {
+        val (x, y) = currentOverlayLayoutParamsOffset() ?: return
+        getSharedPreferences(CloePrefs.NAME, Context.MODE_PRIVATE).edit()
+            .putInt(CloePrefs.KEY_OVERLAY_X, x)
+            .putInt(CloePrefs.KEY_OVERLAY_Y, y)
+            .putBoolean(CloePrefs.KEY_OVERLAY_SAVED, true)
+            .commit()
+        paramsExpanded?.apply { this.x = x; this.y = y }
+        paramsCollapsed?.apply { this.x = x; this.y = y }
+        syncOverlayLayoutFromParams()
+    }
+
+    private fun syncOverlayLayoutFromParams() {
+        try {
+            expandedView?.let { v ->
+                if (v.isAttachedToWindow) paramsExpanded?.let { windowManager.updateViewLayout(v, it) }
+            }
+            collapsedView?.let { v ->
+                if (v.isAttachedToWindow) paramsCollapsed?.let { windowManager.updateViewLayout(v, it) }
+            }
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun syncCollapsedParamsFromExpanded() {
+        val e = paramsExpanded ?: return
+        val c = paramsCollapsed ?: return
+        c.x = e.x
+        c.y = e.y
+    }
+
+    private fun syncExpandedParamsFromCollapsed() {
+        val e = paramsExpanded ?: return
+        val c = paramsCollapsed ?: return
+        e.x = c.x
+        e.y = c.y
+    }
+
     @SuppressLint("ClickableViewAccessibility")
     private fun createExpandedView() {
-        val layout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(android.graphics.Color.TRANSPARENT)
-        }
+        val dp = resources.displayMetrics.density
+        val w = (200 * dp).toInt()
+        val h = (280 * dp).toInt()
 
         val gifView = ImageView(this).apply {
-            val dp = resources.displayMetrics.density
-            layoutParams = LinearLayout.LayoutParams(
-                (200 * dp).toInt(), (280 * dp).toInt()
-            )
             scaleType = ImageView.ScaleType.FIT_CENTER
+            contentDescription = "双击收起为小头像，拖动可移动"
         }
-
-        layout.addView(gifView)
-        expandedView = layout
+        expandedView = gifView
 
         paramsExpanded = WindowManager.LayoutParams(
-            (200 * resources.displayMetrics.density).toInt(),
-            (280 * resources.displayMetrics.density).toInt(),
-            layoutParamsType,
+            w, h, layoutParamsType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                     WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.END
-            x = 16
-            y = 200
+            val (ox, oy) = readOverlayXYFromPrefs()
+            x = ox
+            y = oy
         }
 
-        layout.tag = gifView
-
         var lastX = 0; var lastY = 0; var moved = false
+        var lastUpMs = 0L
         gifView.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
@@ -257,7 +328,24 @@ class CloeService : Service() {
                     lastX = event.rawX.toInt(); lastY = event.rawY.toInt()
                     true
                 }
-                MotionEvent.ACTION_UP -> { if (!moved) showCollapsed(); true }
+                MotionEvent.ACTION_UP -> {
+                    if (!moved) {
+                        val t = SystemClock.uptimeMillis()
+                        if (lastUpMs > 0L && t - lastUpMs < DOUBLE_TAP_MS) {
+                            showCollapsed()
+                            lastUpMs = 0L
+                        } else {
+                            lastUpMs = t
+                        }
+                    } else {
+                        lastUpMs = 0L
+                    }
+                    true
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    lastUpMs = 0L
+                    true
+                }
                 else -> false
             }
         }
@@ -265,36 +353,84 @@ class CloeService : Service() {
 
     @SuppressLint("ClickableViewAccessibility")
     private fun createCollapsedView() {
-        val dot = View(this).apply {
-            setBackgroundColor(android.graphics.Color.parseColor("#FF69B4"))
-        }
-        dot.setOnClickListener { showExpanded() }
+        val dp = resources.displayMetrics.density
+        val size = (56 * dp).toInt()
 
-        collapsedView = dot
+        val shell = FrameLayout(this).apply {
+            layoutParams = ViewGroup.LayoutParams(size, size)
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.parseColor("#E6161820"))
+                setStroke(maxOf(1, (1.5f * dp).toInt()), Color.parseColor("#5EFFFFFF"))
+            }
+            outlineProvider = object : ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: Outline) {
+                    outline.setOval(0, 0, view.width, view.height)
+                }
+            }
+            clipToOutline = true
+            elevation = 6f * dp
+            contentDescription = "双击展开形象，拖动可移动"
+        }
+
+        val thumb = ImageView(this).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+            scaleType = ImageView.ScaleType.CENTER_CROP
+        }
+        shell.addView(thumb)
+        collapsedThumbView = thumb
+        collapsedView = shell
+
         paramsCollapsed = WindowManager.LayoutParams(
-            (50 * resources.displayMetrics.density).toInt(),
-            (50 * resources.displayMetrics.density).toInt(),
-            layoutParamsType,
+            size, size, layoutParamsType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                     WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.END
-            x = 16; y = 200
+            val (ox, oy) = readOverlayXYFromPrefs()
+            x = ox
+            y = oy
         }
 
-        var lastX = 0; var lastY = 0
-        dot.setOnTouchListener { _, event ->
+        var lastX = 0; var lastY = 0; var moved = false
+        var lastUpMs = 0L
+        shell.setOnTouchListener { _, event ->
             when (event.action) {
-                MotionEvent.ACTION_DOWN -> { lastX = event.rawX.toInt(); lastY = event.rawY.toInt(); true }
+                MotionEvent.ACTION_DOWN -> {
+                    lastX = event.rawX.toInt(); lastY = event.rawY.toInt(); moved = false
+                    true
+                }
                 MotionEvent.ACTION_MOVE -> {
                     val dx = event.rawX.toInt() - lastX
                     val dy = event.rawY.toInt() - lastY
+                    if (abs(dx) > 5 || abs(dy) > 5) moved = true
                     paramsCollapsed?.let { p ->
                         p.x -= dx; p.y += dy
                         windowManager.updateViewLayout(collapsedView, p)
                     }
                     lastX = event.rawX.toInt(); lastY = event.rawY.toInt()
+                    true
+                }
+                MotionEvent.ACTION_UP -> {
+                    if (!moved) {
+                        val t = SystemClock.uptimeMillis()
+                        if (lastUpMs > 0L && t - lastUpMs < DOUBLE_TAP_MS) {
+                            showExpanded()
+                            lastUpMs = 0L
+                        } else {
+                            lastUpMs = t
+                        }
+                    } else {
+                        lastUpMs = 0L
+                    }
+                    true
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    lastUpMs = 0L
                     true
                 }
                 else -> false
@@ -304,26 +440,51 @@ class CloeService : Service() {
 
     private fun showExpanded() {
         collapsedView?.let { try { windowManager.removeView(it) } catch (_: Exception) {} }
+        syncExpandedParamsFromCollapsed()
         expandedView?.let { try { windowManager.addView(it, paramsExpanded) } catch (_: Exception) {} }
-        if (lastAction.isBlank()) loadGif("smile")
+        // Collapse (pink dot) sets isWorking=true; expanding again must resume idle/PC-driven state.
+        isWorking = false
+        val resume =
+            if (lastAction.isNotBlank() && pathByAction.containsKey(lastAction)) lastAction else "smile"
+        lastAction = resume
+        loadGif(resume)
+        if (wsClient?.isOpen == true && !isSpeaking) startIdleLoop()
     }
 
     private fun showCollapsed() {
         isWorking = true
         expandedView?.let { try { windowManager.removeView(it) } catch (_: Exception) {} }
+        syncCollapsedParamsFromExpanded()
         collapsedView?.let { try { windowManager.addView(it, paramsCollapsed) } catch (_: Exception) {} }
+        refreshCollapsedChip()
     }
 
-    private fun getGifView(): ImageView? = expandedView?.tag as? ImageView
+    /** Small circular preview matching current (or smile) action */
+    private fun refreshCollapsedChip() {
+        val iv = collapsedThumbView ?: return
+        val action =
+            if (lastAction.isNotBlank() && pathByAction.containsKey(lastAction)) lastAction else "smile"
+        val path = pathByAction[action] ?: return
+        val px = (128 * resources.displayMetrics.density).toInt().coerceAtLeast(96)
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            Glide.with(this@CloeService)
+                .asGif()
+                .load(path)
+                .override(px, px)
+                .into(iv)
+        }
+    }
+
+    private fun getGifView(): ImageView? = expandedView as? ImageView
 
     private fun loadGif(action: String) {
         val filePath = pathByAction[action] ?: return
         val handler = android.os.Handler(android.os.Looper.getMainLooper())
         handler.post {
-            Glide.with(this@CloeService)
-                .asGif()
-                .load(filePath)
-                .into(getGifView() ?: return@post)
+            getGifView()?.let { iv ->
+                Glide.with(this@CloeService).asGif().load(filePath).into(iv)
+            }
+            if (isWorking) refreshCollapsedChip()
         }
     }
 

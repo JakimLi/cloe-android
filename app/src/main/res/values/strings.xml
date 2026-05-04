@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Cloe</string>
+
+    <string name="main_title">Cloe</string>
+    <string name="section_connection">Connection</string>
+    <string name="section_actions">Action Previews</string>
+    <string name="section_settings">Settings</string>
+    <string name="section_language">Language</string>
+    <string name="section_overlay_position">Overlay position</string>
+    <string name="nav_tab_connect">Connect</string>
+    <string name="nav_tab_settings">Settings</string>
+    <string name="nav_tab_actions">Actions</string>
+    <string name="language_tab_hint">Tap an option to switch. The screen refreshes right away.</string>
+    <string name="settings_position_hint">Drag the character on screen to a comfortable spot, then tap save below.</string>
+    <string name="btn_save_overlay_position">Save current overlay position</string>
+    <string name="overlay_position_not_saved">Not saved yet — default top-right offset is used.</string>
+    <string name="overlay_saved_format">Saved: x=%1$d, y=%2$d (relative to top-right)</string>
+    <string name="toast_save_position_need_connect">Connect first so the overlay is on screen.</string>
+    <string name="toast_position_saved">Default position saved</string>
+    <string name="label_tailscale_ip">PC Tailscale IP</string>
+    <string name="hint_tailscale_ip">e.g. 100.x.x.x</string>
+    <!-- Shown in field when nothing saved; also used to detect placeholder input -->
+    <string name="default_host_example" translatable="false">100.x.x.x</string>
+    <string name="btn_overlay_permission">Grant overlay permission</string>
+    <string name="btn_connect">Connect</string>
+    <string name="btn_pull_actions">Pull actions from PC (GIFs)</string>
+    <string name="btn_disconnect">Disconnect</string>
+    <string name="status_need_overlay">⚠ Grant overlay permission first</string>
+    <string name="status_connected">✓ Connected — Cloe is on your screen</string>
+    <string name="status_disconnected">Not connected</string>
+    <string name="toast_enter_ip">Enter your PC Tailscale IP</string>
+    <string name="toast_pull_ok">Pulled %d GIF(s) (all sets)</string>
+    <string name="toast_pull_fail">Pull failed</string>
+
+    <string name="locale_follow_system">System</string>
+    <string name="locale_zh">中文</string>
+    <string name="locale_en">English</string>
+
+    <string name="footer_version">Version %s</string>
+</resources>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Cloe" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">@color/cloe_primary</item>
+        <item name="colorOnPrimary">@color/cloe_on_primary</item>
+        <item name="colorPrimaryContainer">@color/cloe_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/cloe_on_primary_container</item>
+        <item name="android:colorBackground">@color/cloe_surface</item>
+        <item name="colorSurface">@color/cloe_surface</item>
+        <item name="colorOnSurface">@color/cloe_on_surface</item>
+        <item name="colorOnSurfaceVariant">@color/cloe_on_surface_variant</item>
+        <item name="colorOutline">@color/cloe_outline</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+
+    <style name="Widget.Cloe.BottomNavActiveIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
+        <item name="android:color">#E5E7FF</item>
+        <item name="android:width">64dp</item>
+        <item name="android:height">32dp</item>
+    </style>
+</resources>

@@ -1,68 +1,441 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/root_app"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="24dp"
-    android:gravity="center">
+    android:background="#F8F8FB">
 
-    <TextView
-        android:layout_width="wrap_content"
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <!-- TAB 1: Connect -->
+        <androidx.core.widget.NestedScrollView
+            android:id="@+id/tab_connect"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true"
+            android:clipToPadding="false">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingBottom="32dp">
+
+                <!-- Hero Header with Gradient -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="20dp"
+                    android:paddingTop="20dp">
+
+                    <FrameLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_hero_gradient"
+                        android:padding="28dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/main_title"
+                                android:textColor="#FFFFFF"
+                                android:textSize="36sp"
+                                android:textStyle="bold"
+                                android:letterSpacing="-0.02"
+                                android:fontFamily="sans-serif-medium" />
+                        </LinearLayout>
+                    </FrameLayout>
+                </LinearLayout>
+
+                <!-- Status Card -->
+                <LinearLayout
+                    android:id="@+id/banner_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginHorizontal="20dp"
+                    android:layout_marginTop="16dp"
+                    android:padding="18dp"
+                    android:background="@drawable/bg_card_white">
+
+                    <ImageView
+                        android:id="@+id/iv_status_icon"
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        tools:src="@drawable/ic_info" />
+
+                    <TextView
+                        android:id="@+id/tv_status"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="14dp"
+                        android:textSize="14sp"
+                        android:textColor="#1A1A1C"
+                        android:fontFamily="sans-serif-medium"
+                        tools:text="@string/status_disconnected" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/banner_permission_btn"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_marginHorizontal="20dp"
+                    android:layout_marginTop="8dp"
+                    android:visibility="gone">
+
+                    <Button
+                        android:id="@+id/btn_permission"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:text="@string/btn_overlay_permission"
+                        android:backgroundTint="#FF9500"
+                        android:textColor="#FFFFFF"
+                        android:textSize="15sp"
+                        android:textStyle="bold"
+                        app:cornerRadius="16dp"
+                        android:elevation="0dp"
+                        android:stateListAnimator="@null"
+                        app:elevation="0dp" />
+                </LinearLayout>
+
+                <!-- Connection Card -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_marginHorizontal="20dp"
+                    android:layout_marginTop="20dp"
+                    android:padding="20dp"
+                    android:background="@drawable/bg_card_white">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/section_connection"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:textColor="#6366F1"
+                        android:textAllCaps="true"
+                        android:letterSpacing="0.08" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="@string/label_tailscale_ip"
+                        android:textSize="13sp"
+                        android:textColor="#8E8E93" />
+
+                    <EditText
+                        android:id="@+id/et_host"
+                        android:layout_width="match_parent"
+                        android:layout_height="56dp"
+                        android:layout_marginTop="12dp"
+                        android:background="@drawable/bg_rounded_edittext"
+                        android:hint="@string/hint_tailscale_ip"
+                        android:paddingHorizontal="18dp"
+                        android:textSize="16sp"
+                        android:textColor="#1A1A1C"
+                        android:textColorHint="#C7C7CC"
+                        android:inputType="textUri|textNoSuggestions"
+                        android:fontFamily="monospace"
+                        android:maxLines="1" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:orientation="horizontal">
+
+                        <Button
+                            android:id="@+id/btn_disconnect"
+                            android:layout_width="0dp"
+                            android:layout_height="56dp"
+                            android:layout_weight="1"
+                            android:text="@string/btn_disconnect"
+                            android:backgroundTint="#FFE8E8"
+                            android:textColor="#FF3B30"
+                            android:textSize="15sp"
+                            android:textStyle="bold"
+                            android:layout_marginEnd="10dp"
+                            app:cornerRadius="16dp"
+                            android:elevation="0dp"
+                            android:stateListAnimator="@null"
+                            app:elevation="0dp" />
+
+                        <Button
+                            android:id="@+id/btn_connect"
+                            android:layout_width="0dp"
+                            android:layout_height="56dp"
+                            android:layout_weight="2"
+                            android:text="@string/btn_connect"
+                            android:backgroundTint="#6366F1"
+                            android:textColor="#FFFFFF"
+                            android:textSize="15sp"
+                            android:textStyle="bold"
+                            app:cornerRadius="16dp"
+                            android:elevation="0dp"
+                            android:stateListAnimator="@null"
+                            app:elevation="0dp" />
+                    </LinearLayout>
+
+                    <Button
+                        android:id="@+id/btn_pull_actions"
+                        android:layout_width="match_parent"
+                        android:layout_height="56dp"
+                        android:layout_marginTop="10dp"
+                        android:text="@string/btn_pull_actions"
+                        android:backgroundTint="#F2F2F7"
+                        android:textColor="#6366F1"
+                        android:textSize="15sp"
+                        android:textStyle="bold"
+                        app:cornerRadius="16dp"
+                        android:elevation="0dp"
+                        android:stateListAnimator="@null"
+                        app:elevation="0dp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tv_version"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="32dp"
+                    android:gravity="center"
+                    android:textSize="12sp"
+                    android:textColor="#C7C7CC"
+                    tools:text="Version 0.2.0" />
+            </LinearLayout>
+        </androidx.core.widget.NestedScrollView>
+
+        <!-- TAB: Settings -->
+        <androidx.core.widget.NestedScrollView
+            android:id="@+id/tab_settings"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone"
+            android:fillViewport="true"
+            android:clipToPadding="false">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingHorizontal="20dp"
+                android:paddingTop="8dp"
+                android:paddingBottom="32dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/section_settings"
+                    android:textColor="#1A1A1C"
+                    android:textSize="28sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="-0.02" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="24dp"
+                    android:text="@string/section_language"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="#6366F1"
+                    android:textAllCaps="true"
+                    android:letterSpacing="0.08" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/language_tab_hint"
+                    android:textColor="#8E8E93"
+                    android:textSize="15sp"
+                    android:lineSpacingMultiplier="1.2" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:orientation="vertical"
+                    android:padding="8dp"
+                    android:background="@drawable/bg_card_white">
+
+                    <RadioGroup
+                        android:id="@+id/radio_group_locale"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical">
+
+                        <RadioButton
+                            android:id="@+id/radio_locale_system"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:minHeight="56dp"
+                            android:paddingVertical="12dp"
+                            android:text="@string/locale_follow_system"
+                            android:textSize="17sp"
+                            android:textColor="#1A1A1C"
+                            android:buttonTint="#6366F1" />
+
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="1dp"
+                            android:background="#EFEFF4" />
+
+                        <RadioButton
+                            android:id="@+id/radio_locale_zh"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:minHeight="56dp"
+                            android:paddingVertical="12dp"
+                            android:text="@string/locale_zh"
+                            android:textSize="17sp"
+                            android:textColor="#1A1A1C"
+                            android:buttonTint="#6366F1" />
+
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="1dp"
+                            android:background="#EFEFF4" />
+
+                        <RadioButton
+                            android:id="@+id/radio_locale_en"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:minHeight="56dp"
+                            android:paddingVertical="12dp"
+                            android:text="@string/locale_en"
+                            android:textSize="17sp"
+                            android:textColor="#1A1A1C"
+                            android:buttonTint="#6366F1" />
+                    </RadioGroup>
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="28dp"
+                    android:text="@string/section_overlay_position"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="#6366F1"
+                    android:textAllCaps="true"
+                    android:letterSpacing="0.08" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/settings_position_hint"
+                    android:textColor="#8E8E93"
+                    android:textSize="15sp"
+                    android:lineSpacingMultiplier="1.2" />
+
+                <TextView
+                    android:id="@+id/tv_overlay_position"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:textSize="15sp"
+                    android:textColor="#1A1A1C"
+                    tools:text="@string/overlay_position_not_saved" />
+
+                <Button
+                    android:id="@+id/btn_save_overlay_position"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="14dp"
+                    android:text="@string/btn_save_overlay_position"
+                    android:backgroundTint="#6366F1"
+                    android:textColor="#FFFFFF"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    app:cornerRadius="16dp"
+                    android:elevation="0dp"
+                    android:stateListAnimator="@null"
+                    app:elevation="0dp" />
+            </LinearLayout>
+        </androidx.core.widget.NestedScrollView>
+
+        <!-- TAB: Previews -->
+        <LinearLayout
+            android:id="@+id/tab_previews"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingHorizontal="24dp"
+                android:paddingTop="32dp"
+                android:paddingBottom="20dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/section_actions"
+                    android:textColor="#1A1A1C"
+                    android:textSize="28sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="-0.02" />
+            </LinearLayout>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rv_actions"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:paddingHorizontal="12dp"
+                android:paddingBottom="32dp" />
+        </LinearLayout>
+
+    </FrameLayout>
+
+    <!-- Modern Floating Bottom Navigation -->
+    <FrameLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="🌸 Cloe"
-        android:textSize="28sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="24dp" />
+        android:background="#FFFFFF"
+        android:elevation="8dp">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="PC 的 Tailscale IP"
-        android:textSize="14sp"
-        android:layout_marginBottom="8dp" />
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="0.5dp"
+            android:background="#E5E5EA" />
 
-    <EditText
-        android:id="@+id/et_host"
-        android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:inputType="textUri"
-        android:hint="100.x.x.x"
-        android:textAlignment="center"
-        android:background="@android:drawable/edit_text"
-        android:layout_marginBottom="16dp" />
-
-    <Button
-        android:id="@+id/btn_permission"
-        android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:text="授予悬浮窗权限" />
-
-    <Button
-        android:id="@+id/btn_connect"
-        android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:text="连接"
-        android:layout_marginTop="8dp" />
-
-    <Button
-        android:id="@+id/btn_pull_actions"
-        android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:text="从 PC 拉取动作（GIF）"
-        android:layout_marginTop="8dp" />
-
-    <Button
-        android:id="@+id/btn_disconnect"
-        android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:text="断开"
-        android:layout_marginTop="8dp" />
-
-    <TextView
-        android:id="@+id/tv_status"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:textSize="14sp" />
+        <com.google.android.material.bottomnavigation.BottomNavigationView
+            android:id="@+id/bottom_nav"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="#FFFFFF"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            app:menu="@menu/bottom_nav"
+            app:itemIconTint="@color/nav_item_color"
+            app:itemTextColor="@color/nav_item_color"
+            app:itemRippleColor="@android:color/transparent"
+            app:labelVisibilityMode="labeled"
+            app:itemActiveIndicatorStyle="@style/Widget.Cloe.BottomNavActiveIndicator"
+            app:elevation="0dp" />
+    </FrameLayout>
 
 </LinearLayout>

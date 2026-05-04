@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="cloe_primary">#6366F1</color>
+    <color name="cloe_on_primary">#FFFFFF</color>
+    <color name="cloe_primary_container">#E5E7FF</color>
+    <color name="cloe_on_primary_container">#1E1B4B</color>
+    <color name="cloe_surface">#F8F8FB</color>
+    <color name="cloe_surface_variant">#F2F2F7</color>
+    <color name="cloe_on_surface">#1A1A1C</color>
+    <color name="cloe_on_surface_variant">#8E8E93</color>
+    <color name="cloe_outline">#E5E5EA</color>
+    <color name="cloe_scrim">#33000000</color>
+</resources>

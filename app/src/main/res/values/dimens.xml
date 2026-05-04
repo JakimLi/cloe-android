@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="screen_padding_horizontal">20dp</dimen>
+    <dimen name="screen_padding_vertical">16dp</dimen>
+    <dimen name="section_gap">20dp</dimen>
+    <dimen name="card_corner">16dp</dimen>
+    <dimen name="card_padding">20dp</dimen>
+    <dimen name="button_corner">12dp</dimen>
+</resources>
