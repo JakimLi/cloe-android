@@ -1,9 +1,11 @@
 package com.cloe.android
 
+import android.animation.ObjectAnimator
 import android.annotation.SuppressLint
 import android.app.*
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.graphics.Color
 import android.graphics.Outline
 import android.graphics.PixelFormat
@@ -16,12 +18,14 @@ import android.util.Log
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.animation.LinearInterpolator
 import android.view.ViewGroup
 import android.view.ViewOutlineProvider
 import android.view.WindowManager
 import android.media.MediaPlayer
 import android.widget.FrameLayout
 import android.widget.ImageView
+import android.widget.TextView
 import android.widget.Toast
 import com.bumptech.glide.Glide
 import kotlinx.coroutines.*
@@ -33,6 +37,7 @@ import java.io.IOException
 import java.io.StringReader
 import java.net.URI
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 class CloeService : Service() {
 
@@ -101,6 +106,23 @@ class CloeService : Service() {
     /** Collapsed chip: circular preview of current action */
     private var collapsedThumbView: ImageView? = null
 
+    /** Expanded overlay: GIF layer (not the root FrameLayout). */
+    private var expandedGifView: ImageView? = null
+    private var contextBarHud: FrameLayout? = null
+    private var contextBarFill: View? = null
+    private var contextBarText: TextView? = null
+    private var contextBarTrackWidthPx = 0
+    private var contextBarPulse: ObjectAnimator? = null
+
+    private val mainHandler by lazy { android.os.Handler(android.os.Looper.getMainLooper()) }
+
+    private val prefsListener =
+        SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == CloePrefs.KEY_CONTEXT_BAR_VISIBLE) {
+                mainHandler.post { syncContextBarVisibility() }
+            }
+        }
+
     private var wsClient: WebSocketClient? = null
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var idleJob: Job? = null
@@ -127,6 +149,8 @@ class CloeService : Service() {
         super.onCreate()
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         bootstrapActionPaths()
+        getSharedPreferences(CloePrefs.NAME, Context.MODE_PRIVATE)
+            .registerOnSharedPreferenceChangeListener(prefsListener)
     }
 
     private fun bootstrapActionPaths() {
@@ -193,6 +217,9 @@ class CloeService : Service() {
     override fun onDestroy() {
         isRunning = false
         sessionStarted = false
+        stopContextBarPulse()
+        getSharedPreferences(CloePrefs.NAME, Context.MODE_PRIVATE)
+            .unregisterOnSharedPreferenceChangeListener(prefsListener)
         idleJob?.cancel()
         releaseMediaPlayer()
         scope.cancel()
@@ -285,6 +312,59 @@ class CloeService : Service() {
         e.y = c.y
     }
 
+    private fun isContextBarPrefVisible(): Boolean =
+        getSharedPreferences(CloePrefs.NAME, Context.MODE_PRIVATE)
+            .getBoolean(CloePrefs.KEY_CONTEXT_BAR_VISIBLE, true)
+
+    private fun syncContextBarVisibility() {
+        contextBarHud?.visibility = if (isContextBarPrefVisible()) View.VISIBLE else View.GONE
+    }
+
+    private fun stopContextBarPulse() {
+        contextBarPulse?.cancel()
+        contextBarPulse = null
+        contextBarFill?.alpha = 1f
+    }
+
+    private fun startContextBarPulse(fill: View) {
+        if (contextBarPulse != null) return
+        contextBarPulse = ObjectAnimator.ofFloat(fill, View.ALPHA, 1f, 0.7f).apply {
+            duration = 750L
+            repeatMode = ObjectAnimator.REVERSE
+            repeatCount = ObjectAnimator.INFINITE
+            interpolator = LinearInterpolator()
+            start()
+        }
+    }
+
+    private fun fillGradientForUsage(fill: View, pct: Double, dp: Float) {
+        val colors = when {
+            pct >= 90 -> intArrayOf(Color.parseColor("#ff4466"), Color.parseColor("#cc2244"))
+            pct >= 75 -> intArrayOf(Color.parseColor("#ff8844"), Color.parseColor("#ff6622"))
+            pct >= 50 -> intArrayOf(Color.parseColor("#ffe04c"), Color.parseColor("#ffbb22"))
+            else -> intArrayOf(Color.parseColor("#4cff88"), Color.parseColor("#22cc55"))
+        }
+        fill.background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, colors).apply {
+            cornerRadius = 6f * dp
+        }
+    }
+
+    private fun updateContextUsageHud(pct: Double) {
+        val fill = contextBarFill ?: return
+        val label = contextBarText ?: return
+        syncContextBarVisibility()
+        val tw = contextBarTrackWidthPx
+        if (tw <= 0) return
+        val clamped = pct.coerceIn(0.0, 100.0)
+        val fillW = (tw * clamped / 100.0).roundToInt().coerceIn(0, tw)
+        (fill.layoutParams as FrameLayout.LayoutParams).width = fillW
+        fill.requestLayout()
+        label.text = "${clamped.roundToInt()}%"
+        val dp = resources.displayMetrics.density
+        fillGradientForUsage(fill, clamped, dp)
+        if (clamped >= 90.0) startContextBarPulse(fill) else stopContextBarPulse()
+    }
+
     @SuppressLint("ClickableViewAccessibility")
     private fun createExpandedView() {
         val dp = resources.displayMetrics.density
@@ -292,10 +372,72 @@ class CloeService : Service() {
         val h = (280 * dp).toInt()
 
         val gifView = ImageView(this).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
             scaleType = ImageView.ScaleType.FIT_CENTER
             contentDescription = "双击收起为小头像，拖动可移动"
         }
-        expandedView = gifView
+        expandedGifView = gifView
+
+        val barWidth = (w * 0.7f).toInt().coerceAtLeast(1)
+        val barHeight = maxOf((14 * dp).toInt(), 1)
+        contextBarTrackWidthPx = barWidth
+        val marginTop = (8 * dp).toInt()
+
+        val track = FrameLayout(this).apply {
+            layoutParams = FrameLayout.LayoutParams(barWidth, barHeight).apply {
+                gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+                topMargin = marginTop
+            }
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = 7f * dp
+                setColor(Color.argb(140, 0, 0, 0))
+                setStroke(maxOf(1, (1 * dp).toInt()), Color.argb(38, 255, 255, 255))
+            }
+        }
+
+        val fill = View(this).apply {
+            layoutParams = FrameLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT).apply {
+                gravity = Gravity.START or Gravity.CENTER_VERTICAL
+            }
+        }
+        fillGradientForUsage(fill, 0.0, dp)
+        contextBarFill = fill
+        track.addView(fill)
+
+        val pctLabel = TextView(this).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+            gravity = Gravity.CENTER
+            setTextColor(Color.WHITE)
+            textSize = 9f
+            setShadowLayer(2f, 0f, 1f, Color.argb(204, 0, 0, 0))
+            text = "0%"
+        }
+        contextBarText = pctLabel
+        track.addView(pctLabel)
+
+        val hud = FrameLayout(this).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+            isClickable = false
+            addView(track)
+        }
+        contextBarHud = hud
+        syncContextBarVisibility()
+
+        val root = FrameLayout(this).apply {
+            addView(gifView)
+            addView(hud)
+        }
+        expandedView = root
 
         paramsExpanded = WindowManager.LayoutParams(
             w, h, layoutParamsType,
@@ -311,7 +453,7 @@ class CloeService : Service() {
 
         var lastX = 0; var lastY = 0; var moved = false
         var lastUpMs = 0L
-        gifView.setOnTouchListener { _, event ->
+        root.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     lastX = event.rawX.toInt(); lastY = event.rawY.toInt(); moved = false
@@ -475,7 +617,7 @@ class CloeService : Service() {
         }
     }
 
-    private fun getGifView(): ImageView? = expandedView as? ImageView
+    private fun getGifView(): ImageView? = expandedGifView
 
     private fun loadGif(action: String) {
         val filePath = pathByAction[action] ?: return
@@ -522,6 +664,11 @@ class CloeService : Service() {
             val trimmed = raw.trim()
             if (trimmed.startsWith("{")) {
                 val o = JSONObject(trimmed)
+                if (o.optString("type") == "context-usage") {
+                    val pct = o.optDouble("usage_pct", 0.0).coerceIn(0.0, 100.0)
+                    mainHandler.post { updateContextUsageHud(pct) }
+                    return
+                }
                 if (o.optString("type") == "set-config") {
                     applySetConfig(o)
                     return

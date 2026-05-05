@@ -24,6 +24,7 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import android.widget.RadioGroup
 import com.google.android.material.bottomnavigation.BottomNavigationView
+import com.google.android.material.switchmaterial.SwitchMaterial
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -196,6 +197,13 @@ class MainActivity : AppCompatActivity() {
 
         tvVersion.text = getString(R.string.footer_version, packageVersionName())
         bindLocaleRadios()
+
+        val sp = getSharedPreferences(CloePrefs.NAME, Context.MODE_PRIVATE)
+        val switchContextBar = findViewById<SwitchMaterial>(R.id.switch_context_bar)
+        switchContextBar.isChecked = sp.getBoolean(CloePrefs.KEY_CONTEXT_BAR_VISIBLE, true)
+        switchContextBar.setOnCheckedChangeListener { _, isChecked ->
+            sp.edit().putBoolean(CloePrefs.KEY_CONTEXT_BAR_VISIBLE, isChecked).apply()
+        }
 
         btnSaveOverlayPosition.setOnClickListener {
             if (!CloeService.isRunning) {

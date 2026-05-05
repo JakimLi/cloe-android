@@ -7,6 +7,9 @@
     <string name="section_actions">Action Previews</string>
     <string name="section_settings">Settings</string>
     <string name="section_language">Language</string>
+    <string name="section_context_usage">Context usage</string>
+    <string name="context_bar_title">Context usage bar</string>
+    <string name="context_bar_desc">Show AI context window usage above the character, like a health bar</string>
     <string name="section_overlay_position">Overlay position</string>
     <string name="nav_tab_connect">Connect</string>
     <string name="nav_tab_settings">Settings</string>

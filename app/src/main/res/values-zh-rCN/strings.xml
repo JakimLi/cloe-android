@@ -7,6 +7,9 @@
     <string name="section_actions">动作预览</string>
     <string name="section_settings">设置</string>
     <string name="section_language">语言</string>
+    <string name="section_context_usage">上下文用量</string>
+    <string name="context_bar_title">上下文用量条</string>
+    <string name="context_bar_desc">在角色上方显示 AI 上下文窗口占用比例（类似血条）</string>
     <string name="section_overlay_position">悬浮位置</string>
     <string name="nav_tab_connect">连接</string>
     <string name="nav_tab_settings">设置</string>

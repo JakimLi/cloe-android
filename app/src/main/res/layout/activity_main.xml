@@ -331,6 +331,57 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="28dp"
+                    android:text="@string/section_context_usage"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="#6366F1"
+                    android:textAllCaps="true"
+                    android:letterSpacing="0.08" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="12dp"
+                    android:background="@drawable/bg_card_white">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/context_bar_title"
+                            android:textSize="17sp"
+                            android:textColor="#1A1A1C" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="@string/context_bar_desc"
+                            android:textColor="#8E8E93"
+                            android:textSize="14sp"
+                            android:lineSpacingMultiplier="1.2" />
+                    </LinearLayout>
+
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/switch_context_bar"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp" />
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="28dp"
                     android:text="@string/section_overlay_position"
                     android:textSize="13sp"
                     android:textStyle="bold"
