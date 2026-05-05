@@ -648,6 +648,16 @@ class CloeService : Service() {
 
     private fun startIdleLoop() {
         idleJob?.cancel()
+        if (idleActions.isEmpty()) return
+        // Immediately show a random idle GIF (no delay — used after speak/reconnect)
+        var next = idleActions.random()
+        var guard = 0
+        while (next == lastAction && idleActions.size > 1 && guard++ < 8) {
+            next = idleActions.random()
+        }
+        lastAction = next
+        loadGif(next)
+        // Then schedule the next idle with the usual delay
         scheduleNextIdle()
     }
 
@@ -709,7 +719,8 @@ class CloeService : Service() {
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to download/play audio: ${e.message}")
                 isSpeaking = false
-                if (!isWorking) scheduleNextIdle()
+                isWorking = false
+                startIdleLoop()
             }
         }
     }
@@ -759,12 +770,14 @@ class CloeService : Service() {
                 setOnCompletionListener {
                     Log.i(TAG, "Audio completed: ${file.name}")
                     isSpeaking = false
-                    if (!isWorking) scheduleNextIdle()
+                    isWorking = false   // 解锁 working 状态，避免死锁（与桌面端同步）
+                    startIdleLoop()     // 立刻切换到 idle GIF，不再等 8-15 秒
                 }
                 setOnErrorListener { _, what, extra ->
                     Log.e(TAG, "Audio error: what=$what extra=$extra")
                     isSpeaking = false
-                    if (!isWorking) scheduleNextIdle()
+                    isWorking = false
+                    startIdleLoop()
                     true
                 }
                 prepareAsync()
@@ -772,7 +785,8 @@ class CloeService : Service() {
         } catch (e: Exception) {
             Log.e(TAG, "MediaPlayer error: ${e.message}")
             isSpeaking = false
-            if (!isWorking) scheduleNextIdle()
+            isWorking = false
+            startIdleLoop()
         }
     }
 
