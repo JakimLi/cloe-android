@@ -616,8 +616,11 @@ class CloeService : Service() {
                 }
             }
             else -> {
-                stopSpeaking()
-                playAction(action)
+                if (isSpeaking) {
+                    Log.i(TAG, "Dropped — speak in progress: $action")
+                } else {
+                    playAction(action)
+                }
             }
         }
     }
