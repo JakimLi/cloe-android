@@ -126,6 +126,7 @@ class CloeService : Service() {
     private var wsClient: WebSocketClient? = null
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var idleJob: Job? = null
+    private var speakJob: Job? = null
     private var isWorking = false
     private var isSpeaking = false
     private var mediaPlayer: MediaPlayer? = null
@@ -221,6 +222,7 @@ class CloeService : Service() {
         getSharedPreferences(CloePrefs.NAME, Context.MODE_PRIVATE)
             .unregisterOnSharedPreferenceChangeListener(prefsListener)
         idleJob?.cancel()
+        speakJob?.cancel()
         releaseMediaPlayer()
         scope.cancel()
         wsClient?.close()
@@ -738,36 +740,45 @@ class CloeService : Service() {
     private fun dispatchAction(action: String, full: JSONObject?) {
         when (action) {
             "idle" -> {
-                if (isSpeaking) return // don't interrupt speaking
+                if (isSpeaking) return // 音频播放中不切idle，等音频结束自动恢复
                 isWorking = false
                 startIdleLoop()
             }
             "working" -> {
-                stopSpeaking()
                 isWorking = true
                 idleJob?.cancel()
-                playAction("working")
+                // 不杀音频——语音和动画解耦。只切换GIF到working，音频播完自行结束。
+                if (isSpeaking) {
+                    lastAction = "working"
+                    loadGif("working")
+                } else {
+                    playAction("working")
+                }
             }
             "wave" -> {
-                stopSpeaking()
                 showExpanded()
-                playAction("wave")
+                // 不杀音频——语音和动画解耦。只切换GIF到wave，音频播完自行结束。
+                if (isSpeaking) {
+                    lastAction = "wave"
+                    loadGif("wave")
+                } else {
+                    playAction("wave")
+                }
             }
             "speak" -> {
                 val audioName = full?.optString("audio", "") ?: ""
                 val audioUrl = full?.optString("audio_url", "") ?: ""
                 if (audioName.isNotEmpty() || audioUrl.isNotEmpty()) {
+                    // 新speak请求：中断旧音频，播放新的
                     playSpeakWithAudio(audioName, audioUrl)
                 } else {
-                    playAction("speak")
+                    // 纯动画speak，音频播放中则忽略（避免画面闪跳）
+                    if (!isSpeaking) playAction("speak")
                 }
             }
             else -> {
-                if (isSpeaking) {
-                    Log.i(TAG, "Dropped — speak in progress: $action")
-                } else {
-                    playAction(action)
-                }
+                // 音画解耦：音频播放中也可以切换GIF，但音频不受任何影响
+                playAction(action)
             }
         }
     }
@@ -834,6 +845,10 @@ class CloeService : Service() {
     // === Speak with audio ===
 
     private fun playSpeakWithAudio(audioName: String, audioUrl: String) {
+        // 新speak请求：取消旧下载、停旧音频
+        speakJob?.cancel()
+        releaseMediaPlayer()
+
         idleJob?.cancel()
         isSpeaking = true
 
@@ -856,18 +871,19 @@ class CloeService : Service() {
             }
         }
 
-        scope.launch {
+        speakJob = scope.launch {
             try {
                 val audioFile = downloadAudio(url)
                 if (!isSpeaking) return@launch // cancelled while downloading
                 withContext(Dispatchers.Main) {
                     playAudioWithSpeakGif(audioFile)
                 }
+            } catch (e: CancellationException) {
+                Log.i(TAG, "Speak download cancelled (new speak started)")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to download/play audio: ${e.message}")
                 isSpeaking = false
-                isWorking = false
-                startIdleLoop()
+                if (!isWorking) startIdleLoop()
             }
         }
     }
@@ -917,14 +933,19 @@ class CloeService : Service() {
                 setOnCompletionListener {
                     Log.i(TAG, "Audio completed: ${file.name}")
                     isSpeaking = false
-                    isWorking = false   // 解锁 working 状态，避免死锁（与桌面端同步）
-                    startIdleLoop()     // 立刻切换到 idle GIF，不再等 8-15 秒
+                    // isWorking 可能被 working 事件在播放期间设置，不要强制清除
+                    // 如果 working 正在进行，恢复 working.gif；否则恢复 idle
+                    if (isWorking) {
+                        lastAction = "working"
+                        loadGif("working")
+                    } else {
+                        startIdleLoop()
+                    }
                 }
                 setOnErrorListener { _, what, extra ->
                     Log.e(TAG, "Audio error: what=$what extra=$extra")
                     isSpeaking = false
-                    isWorking = false
-                    startIdleLoop()
+                    if (!isWorking) startIdleLoop()
                     true
                 }
                 prepareAsync()
@@ -932,8 +953,7 @@ class CloeService : Service() {
         } catch (e: Exception) {
             Log.e(TAG, "MediaPlayer error: ${e.message}")
             isSpeaking = false
-            isWorking = false
-            startIdleLoop()
+            if (!isWorking) startIdleLoop()
         }
     }
 
